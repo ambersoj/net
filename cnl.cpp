@@ -11,7 +11,7 @@
 #include <poll.h>
 #include <cstdlib>
 
-#define PORT_BASE 5000
+#define PORT_BASE 7000
 
 class UDPChannel {
 public:
