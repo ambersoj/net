@@ -265,6 +265,13 @@ void Net::do_tx()
 
     libnet_clear_packet(libnet_);
     regs_.tx_done = true;
+
+    send_bus({
+        {"component", "NET"},
+        {"status", {
+            {"tx_done", true}
+        }}
+    });
 }
 
 // -----------------------------------------------------------------------------
@@ -292,7 +299,14 @@ void Net::do_rx()
     j["rx_len"]    = regs_.rx_len;
     j["rx_caplen"] = regs_.rx_caplen;
 
-    send_bus(j);
+    send_bus({
+        {"component", "NET"},
+        {"status", {
+            {"rx_done", true},
+            {"rx_len", regs_.rx_len},
+            {"rx_caplen", regs_.rx_caplen}
+        }}
+    });
 }
 
 // -----------------------------------------------------------------------------
