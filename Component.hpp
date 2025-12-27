@@ -51,6 +51,23 @@ namespace mpp
 
         void run()
         {
+
+
+            json belief;
+belief["component"] = "NET";
+belief["subject"]   = "net.started";
+belief["polarity"]  = true;
+belief["context"]   = json::object();
+
+json msg;
+msg["belief"] = belief;
+
+send_bus(msg);
+
+
+
+
+
             std::cout << "[MPP] running on sba=" << sba_;
             if (listen_bus_)
                 std::cout << " (listening BUS)";
@@ -131,6 +148,34 @@ namespace mpp
         uint64_t publish_period_ms_;
         bool listen_bus_;
         std::atomic<bool> running_;
+
+// Belief emission hook (HUD / NPL will listen on BUS)
+        void commit(const char* subject,
+                    bool polarity,
+                const json& context = json::object())
+        {
+            if (!subject || !*subject)
+                return;
+
+            const char* comp =
+                static_cast<Derived*>(this)->component_name();
+
+            const size_t n = std::strlen(comp);
+            if (std::strncmp(subject, comp, n) != 0 || subject[n] != '.')
+                return;
+
+            json j;
+            j["belief"] = {
+                {"component", comp},
+                {"subject", subject},
+                {"polarity", polarity}
+            };
+
+            if (!context.empty())
+                j["belief"]["context"] = context;
+
+            send_bus(j);
+        }
 
     private:
         int udp_fd_;

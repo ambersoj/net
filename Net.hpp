@@ -79,6 +79,8 @@ class Net : public mpp::Component<Net>
 public:
     explicit Net(int sba);
     ~Net();
+    
+    static constexpr const char* component_name() { return "NET"; }
 
     // MPP interface
     json serialize_registers() const;

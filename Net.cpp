@@ -266,12 +266,8 @@ void Net::do_tx()
     libnet_clear_packet(libnet_);
     regs_.tx_done = true;
 
-    send_bus({
-        {"component", "NET"},
-        {"status", {
-            {"tx_done", true}
-        }}
-    });
+    // COMMIT: NET asserts it has fired TX
+    commit("NET.tx.fire.committed", true);
 }
 
 // -----------------------------------------------------------------------------
@@ -298,6 +294,9 @@ void Net::do_rx()
     j["rx_done"]   = true;
     j["rx_len"]    = regs_.rx_len;
     j["rx_caplen"] = regs_.rx_caplen;
+
+// COMMIT: net.rx.sampled = true
+// COMMIT: net.rx.done = true
 
     send_bus({
         {"component", "NET"},
