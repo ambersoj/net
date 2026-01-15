@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug net",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/usr/local/mppxfr/net/net",
+            "args": [4002],
+            "stopAtEntry": false,
+            "cwd": "/usr/local/mppxfr/net",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "preLaunchTask": "Build net",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}

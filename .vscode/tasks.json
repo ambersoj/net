@@ -1,0 +1,29 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build net",
+            "type": "shell",
+            "command": "g++",
+            "args": [
+                "-std=c++20",
+                "-g",
+                "-O0",
+                "-o",
+                "net",
+                "main.cpp",
+                "Net.cpp",
+                "-lnet",
+                "-lpcap"
+            ],
+            "options": {
+                "cwd": "/usr/local/mppxfr/net"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"]
+        }
+    ]
+}
