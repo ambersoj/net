@@ -7,6 +7,7 @@
 
 #include <pcap/pcap.h>
 #include <libnet.h>
+#include <thread>
 
 using json = nlohmann::ordered_json;
 
@@ -25,6 +26,7 @@ struct NetRegisters
     bool pcap_destroy   = false;
 
     // TX / RX triggers
+    bool net_rx_enable = false;
     bool tx_fire = false;
     bool rx_fire = false;
 
@@ -94,6 +96,9 @@ private:
     // Handles
     libnet_t* libnet_ = nullptr;
     pcap_t*   pcap_   = nullptr;
+
+    std::thread rx_thread_;
+    std::atomic<bool> rx_thread_running{false};
 
     NetRegisters regs_;
 

@@ -52,7 +52,8 @@ json Net::serialize_registers() const
 // -----------------------------------------------------------------------------
 void Net::apply_snapshot(const json& j)
 {
-    // --------------------
+
+   // --------------------
     // Configuration
     // --------------------
     if (j.contains("libnet_device")) regs_.libnet_device = j["libnet_device"];
@@ -111,6 +112,9 @@ void Net::apply_snapshot(const json& j)
     // --------------------
     // Actions
     // --------------------
+    if (j.contains("net_rx_enable"))
+        regs_.net_rx_enable = j["net_rx_enable"];
+
     if (j.value("tx_fire", false)) {
         regs_.tx_done = false;
         do_tx();
@@ -120,9 +124,27 @@ void Net::apply_snapshot(const json& j)
         regs_.rx_done = false;
         do_rx();
     }
-    if (j.value("tick", false)) {
-        do_rx();
+    if (j.contains("net_rx_enable")) {
+        bool en = j["net_rx_enable"];
+        regs_.net_rx_enable = en;
+
+        if (en && !rx_thread_running) {
+            rx_thread_running = true;
+            rx_thread_ = std::thread([this]() {
+                while (rx_thread_running) {
+                    do_rx();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+            });
+        }
+
+        if (!en && rx_thread_running) {
+            rx_thread_running = false;
+            if (rx_thread_.joinable())
+                rx_thread_.join();
+        }
     }
+
 }
 
 // -----------------------------------------------------------------------------
@@ -130,7 +152,6 @@ void Net::apply_snapshot(const json& j)
 // -----------------------------------------------------------------------------
 void Net::on_message(const json& j)
 {
-
 }
 
 // -----------------------------------------------------------------------------
