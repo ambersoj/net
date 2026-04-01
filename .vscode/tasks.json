@@ -17,7 +17,7 @@
                 "-lpcap"
             ],
             "options": {
-                "cwd": "/usr/local/mppxfr/net"
+                "cwd": "/usr/local/mpp/net"
             },
             "group": {
                 "kind": "build",

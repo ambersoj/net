@@ -7,9 +7,9 @@
 // Construction / Destruction
 // -----------------------------------------------------------------------------
 Net::Net(int sba)
-    : mpp::Component<Net>(sba, /*publish_period_ms=*/0, /*listen_bus=*/true)
+    : mpp::Component<Net>(sba)
 {
-    regs_.sba = sba;
+    regs_.sba_ = sba;
 }
 
 Net::~Net()
@@ -25,7 +25,7 @@ json Net::serialize_registers() const
 {
     json j;
     j["component"] = "NET";
-    j["sba"]       = regs_.sba;
+    j["sba"]       = regs_.sba_;
 
     // Devices
     j["libnet_device"] = regs_.libnet_device;
@@ -40,6 +40,7 @@ json Net::serialize_registers() const
     j["rx_done"]   = regs_.rx_done;
     j["rx_len"]    = regs_.rx_len;
     j["rx_caplen"] = regs_.rx_caplen;
+    j["icmp4_seq"] = regs_.icmp4_seq;
 
     // Errors
     j["last_error"] = regs_.last_error;
@@ -105,10 +106,6 @@ void Net::apply_snapshot(const json& j)
         }
     }
 
-    if (j.value("read", false)) {
-        reply_json(serialize_registers());
-    }
-
     // --------------------
     // Actions
     // --------------------
@@ -144,6 +141,17 @@ void Net::apply_snapshot(const json& j)
                 rx_thread_.join();
         }
     }
+
+    if (!j.contains("verb"))
+        return;
+
+    const std::string verb = j["verb"];
+
+    if (verb == "GET") {
+        reply_json(serialize_registers());
+        return;
+    }
+
 
 }
 
@@ -205,6 +213,9 @@ void Net::do_pcap_create()
         set_error(errbuf);
         return;
     }
+
+    pcap_setnonblock(pcap_, 1, errbuf);
+    
 }
 
 void Net::do_pcap_destroy()
@@ -253,7 +264,7 @@ void Net::do_tx()
         regs_.icmp4_code,
         0,
         regs_.icmp4_id,
-        regs_.icmp4_seq++,
+        ++regs_.icmp4_seq,
         payload,
         payload_len,
         libnet_,
@@ -294,7 +305,11 @@ void Net::do_tx()
     libnet_clear_packet(libnet_);
     regs_.tx_done = true;
 
-    commit("NET.tx_done", true);
+    json j;
+    j["component"] = "NET";
+    j["tx_done"] = true;
+
+    send_json(j, 5001); // temporary: FSM port
 }
 
 // -----------------------------------------------------------------------------
@@ -316,17 +331,11 @@ void Net::do_rx()
     regs_.rx_len    = hdr->len;
     regs_.rx_caplen = hdr->caplen;
 
-    commit("NET.rx_done", true, {
-        {"rx_len", regs_.rx_len},
-        {"rx_caplen", regs_.rx_caplen}
-    });
-
     json j;
     j["component"] = "NET";
     j["rx_done"]   = true;
-    j["rx_len"]    = regs_.rx_len;
-    j["rx_caplen"] = regs_.rx_caplen;
 
+    send_json(j, 5001); // temporary
 }
 
 // -----------------------------------------------------------------------------
@@ -346,3 +355,6 @@ void Net::set_error(const std::string& msg)
 {
     regs_.last_error = msg;
 }
+
+
+

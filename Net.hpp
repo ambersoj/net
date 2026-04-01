@@ -17,7 +17,7 @@ using json = nlohmann::ordered_json;
 struct NetRegisters
 {
     // Identity
-    int sba = 0;
+    int sba_ = 0;
 
     // Lifecycle
     bool libnet_create  = false;

@@ -1,24 +1,47 @@
+I'm not sure if I really was supposed to (according to your recommendations) but I added the line that commits the sequence number into the code:
 
-alias startxfr='
-../bls/bls 4000 & \
-#
-../net/net 5000 & \
-../tck/tck-fsm-net 5001 & \
-../tck/tck-net 5003 & \
-./fsm-net 5002 & \
-#
-../xfr/xfr 6000 & \
-../tck/tck-fsm-xfr 6001 & \
-./fsm-xfr 6002 &
-'
+    libnet_build_icmpv4_echo(
+        regs_.icmp4_type,
+        regs_.icmp4_code,
+        0,
+        regs_.icmp4_id,
+        ++regs_.icmp4_seq,
+        payload,
+        payload_len,
+        libnet_,
+        0
+    );
 
-     - printf '{"verb":"PUT","resource":"fsm","body":{"fsm_text":%s,"target_sba":5000, "tck_sba":5001}}' "$(jq -Rs . < fsm-net.puml)" | nc -u -w1 127.0.0.1 5002
+    // ***************** NEW ***********************
+    commit("NET.icmp4_seq", true,
+        {"icmp4_seq", regs_.icmp4_seq}
+    );
 
-     - printf '{"verb":"PUT","resource":"fsm","body":{"fsm_text":%s,"target_sba":6000, "tck_sba":6001}}' "$(jq -Rs . < fsm-xfr.puml)" | nc -u -w1 127.0.0.1 6002
+So at least for now it is a commit in code, not a _commit in puml.
 
-     - echo '{"enable": true, "target_sba":5000}' | nc -u -w1 127.0.0.1 5003
-     - echo '{"enable": true, "target_sba":5002}' | nc -u -w1 127.0.0.1 5001
-     - echo '{"enable": true, "target_sba":6002}' | nc -u -w1 127.0.0.1 6001
+Also, I added icmp4_seq in the register dump.
 
-echo '{"belief":{"subject":"FSM.XFR.start","polarity":true}}'  | nc -u -w1 127.0.0.1 4000
+Net::serialize_registers()
+     .
+     .
+     .
+    // RX / TX status
+    j["tx_done"]   = regs_.tx_done;
+    j["rx_done"]   = regs_.rx_done;
+    j["rx_len"]    = regs_.rx_len;
+    j["rx_caplen"] = regs_.rx_caplen;
+    j["icmp4_seq"] = regs_.icmp4_seq;
+     .
+     .
+     .
+
+And when I ran start105 for a while and did a couple register dumps it looks as it should:
+
+root@PRED:/usr/local/mpp/fsm# echo '{"verb":"GET"}' | nc -u -w1 127.0.0.1 5000
+{"component":"NET","sba":5000,"libnet_device":"eno1","pcap_device":"eno1","libnet_live":true,"pcap_live":true,"tx_done":true,"rx_done":true,"rx_len":60,"rx_caplen":60,"icmp4_seq":19,"last_error":""}
+root@PRED:/usr/local/mpp/fsm# echo '{"verb":"GET"}' | nc -u -w1 127.0.0.1 5000
+{"component":"NET","sba":5000,"libnet_device":"eno1","pcap_device":"eno1","libnet_live":true,"pcap_live":true,"tx_done":true,"rx_done":false,"rx_len":60,"rx_caplen":60,"icmp4_seq":27,"last_error":""}
+
+with the first one at ping number 19 and the next one at 27.
+
 
