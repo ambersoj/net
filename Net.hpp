@@ -18,6 +18,7 @@ struct NetRegisters
 {
     // Identity
     int sba_ = 0;
+    int fsm_sba_ = 5000;
 
     // Lifecycle
     bool libnet_create  = false;

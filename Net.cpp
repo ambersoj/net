@@ -264,7 +264,7 @@ void Net::do_tx()
         regs_.icmp4_code,
         0,
         regs_.icmp4_id,
-        ++regs_.icmp4_seq,
+        regs_.icmp4_seq,
         payload,
         payload_len,
         libnet_,
@@ -309,7 +309,7 @@ void Net::do_tx()
     j["component"] = "NET";
     j["tx_done"] = true;
 
-    send_json(j, 5001); // temporary: FSM port
+    send_json(j, regs_.fsm_sba_);
 }
 
 // -----------------------------------------------------------------------------
@@ -327,15 +327,38 @@ void Net::do_rx()
     if (rc <= 0)
         return;
 
-    regs_.rx_done   = true;
-    regs_.rx_len    = hdr->len;
-    regs_.rx_caplen = hdr->caplen;
+    constexpr int ETH_HDR  = 14;
+    constexpr int IP_HDR   = 20;
+    constexpr int ICMP_HDR = 8;
 
-    json j;
-    j["component"] = "NET";
-    j["rx_done"]   = true;
+    int icmp_offset = ETH_HDR + IP_HDR;
+    int payload_offset = icmp_offset + ICMP_HDR;
 
-    send_json(j, 5001); // temporary
+    if (hdr->caplen < payload_offset)
+        return;
+
+    uint16_t seq =
+        ntohs(*(uint16_t*)(data + icmp_offset + 6));
+
+    const char* payload =
+        (const char*)(data + payload_offset);
+
+    int payload_len =
+        hdr->caplen - payload_offset;
+
+    json fsm_data_out;
+    fsm_data_out["component"] = "NET";
+    fsm_data_out["seq"] = seq;
+    fsm_data_out["buffer"] = std::string(payload, payload_len);
+    fsm_data_out["len"] = payload_len;
+
+    send_json(fsm_data_out, regs_.fsm_sba_);
+
+    json out;
+    out["component"] = "NET";
+    out["rx_valid"] = true;
+
+    send_json(out, regs_.fsm_sba_);
 }
 
 // -----------------------------------------------------------------------------
