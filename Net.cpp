@@ -113,12 +113,12 @@ void Net::apply_snapshot(const json& j)
         regs_.net_rx_enable = j["net_rx_enable"];
 
     if (j.value("tx_fire", false)) {
-        regs_.tx_done = false;
+        regs_.tx_fire = false; // consume tx_fire
         do_tx();
     }
 
     if (j.value("rx_fire", false)) {
-        regs_.rx_done = false;
+        regs_.rx_fire = false; // consume rx_fire
         do_rx();
     }
     if (j.contains("net_rx_enable")) {
@@ -151,8 +151,6 @@ void Net::apply_snapshot(const json& j)
         reply_json(serialize_registers());
         return;
     }
-
-
 }
 
 // -----------------------------------------------------------------------------
@@ -255,9 +253,23 @@ void Net::do_tx()
         return;
     }
 
-    const uint8_t* payload =
-        reinterpret_cast<const uint8_t*>(regs_.icmp4_payload.data());
-    uint32_t payload_len = regs_.icmp4_payload.size();
+    XfrHeader hdr;
+    hdr.magic = htonl(0x58465230); // "XFR0"
+    hdr.seq   = htonl(regs_.icmp4_seq);
+    hdr.len   = htonl(regs_.icmp4_payload.size());
+    hdr.flags = htonl(regs_.eof ? 0x01 : 0x00);
+
+    std::vector<uint8_t> packet(sizeof(XfrHeader));
+    memcpy(packet.data(), &hdr, sizeof(hdr));
+
+    packet.insert(
+        packet.end(),
+        regs_.icmp4_payload.begin(),
+        regs_.icmp4_payload.end()
+    );
+
+    const uint8_t* payload = packet.data();
+    uint32_t payload_len   = packet.size();
 
     libnet_build_icmpv4_echo(
         regs_.icmp4_type,
@@ -307,9 +319,11 @@ void Net::do_tx()
 
     json j;
     j["component"] = "NET";
-    j["tx_done"] = true;
+    j["tx_done"] = regs_.tx_done;
 
     send_json(j, regs_.fsm_sba_);
+
+    regs_.tx_done = false; // consume tx_done
 }
 
 // -----------------------------------------------------------------------------
@@ -320,10 +334,10 @@ void Net::do_rx()
     if (!pcap_)
         return;
 
-    struct pcap_pkthdr* hdr = nullptr;
+    struct pcap_pkthdr* pcap_hdr = nullptr;
     const u_char* data = nullptr;
 
-    int rc = pcap_next_ex(pcap_, &hdr, &data);
+    int rc = pcap_next_ex(pcap_, &pcap_hdr, &data);
     if (rc <= 0)
         return;
 
@@ -334,33 +348,46 @@ void Net::do_rx()
     int icmp_offset = ETH_HDR + IP_HDR;
     int payload_offset = icmp_offset + ICMP_HDR;
 
-    if (hdr->caplen < payload_offset)
+    if (pcap_hdr->caplen < payload_offset)
         return;
 
-    uint16_t seq =
-        ntohs(*(uint16_t*)(data + icmp_offset + 6));
-
-    const char* payload =
-        (const char*)(data + payload_offset);
+    const uint8_t* payload =
+        (const uint8_t*)(data + payload_offset);
 
     int payload_len =
-        hdr->caplen - payload_offset;
+        pcap_hdr->caplen - payload_offset;
 
-    json fsm_data_out;
-    fsm_data_out["component"] = "NET";
-    fsm_data_out["seq"] = seq;
-    fsm_data_out["buffer"] = std::string(payload, payload_len);
-    fsm_data_out["len"] = payload_len;
+    if (payload_len < (int)sizeof(XfrHeader))
+        return;
 
-    send_json(fsm_data_out, regs_.fsm_sba_);
+    XfrHeader xhdr;
+    memcpy(&xhdr, payload, sizeof(xhdr));
+
+    if (ntohl(xhdr.magic) != 0x58465230)
+        return;
+
+    uint32_t seq   = ntohl(xhdr.seq);
+    uint32_t len   = ntohl(xhdr.len);
+    uint32_t flags = ntohl(xhdr.flags);
+
+    regs_.eof = (flags & 0x01) != 0;
+
+    const char* data_ptr =
+        reinterpret_cast<const char*>(payload + sizeof(XfrHeader));
+
+    regs_.buffer.assign(data_ptr, len);
+    regs_.rx_len = len;
 
     json out;
     out["component"] = "NET";
-    out["rx_valid"] = true;
+    out["rx_done"] = true;
+    out["seq"] = seq;
+    out["buffer"] = regs_.buffer;
+    out["len"] = len;
+    out["eof"] = regs_.eof;
 
     send_json(out, regs_.fsm_sba_);
 }
-
 // -----------------------------------------------------------------------------
 // Errors
 // -----------------------------------------------------------------------------

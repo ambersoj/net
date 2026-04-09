@@ -11,6 +11,16 @@
 
 using json = nlohmann::ordered_json;
 
+#pragma pack(push,1)
+struct XfrHeader
+{
+    uint32_t magic;   // 'XFR0'
+    uint32_t seq;
+    uint32_t len;
+    uint32_t flags;   // bit0 = EOF
+};
+#pragma pack(pop)
+
 // -----------------------------------------------------------------------------
 // NET Registers (Canonical MPP Form)
 // -----------------------------------------------------------------------------
@@ -67,8 +77,11 @@ struct NetRegisters
     uint32_t rx_len = 0;
     uint32_t rx_caplen = 0;
 
+    std::string buffer = "";
+
     // TX status (optional but recommended)
     bool tx_done = false;
+    bool eof = false;
 
     // Errors
     std::string last_error;
