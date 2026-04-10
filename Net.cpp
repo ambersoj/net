@@ -83,12 +83,18 @@ void Net::apply_snapshot(const json& j)
     if (j.contains("icmp4_payload")) regs_.icmp4_payload = j["icmp4_payload"];
 
     // --------------------
+    // eof
+    // --------------------
+    if (j.contains("eof"))           regs_.eof           = j["eof"];
+
+    // --------------------
     // Lifecycle
     // --------------------
     if (j.value("libnet_create", false))  do_libnet_create();
     if (j.value("libnet_destroy", false)) do_libnet_destroy();
     if (j.value("pcap_create", false))    do_pcap_create();
     if (j.value("pcap_destroy", false))   do_pcap_destroy();
+
 
     // --------------------
     // PCAP filter
@@ -387,6 +393,8 @@ void Net::do_rx()
     out["eof"] = regs_.eof;
 
     send_json(out, regs_.fsm_sba_);
+
+    regs_.rx_done = false; // Consume rx_done
 }
 // -----------------------------------------------------------------------------
 // Errors
